@@ -3,6 +3,7 @@ package main
 import (
 	"demo/purpleSchool/configs"
 	"demo/purpleSchool/internal/auth"
+	"demo/purpleSchool/internal/department"
 	"demo/purpleSchool/internal/employees"
 	"demo/purpleSchool/internal/link"
 	"demo/purpleSchool/internal/messages"
@@ -31,6 +32,10 @@ func main() {
 		Config: conf,
 	})
 	messages.NewMessagesHandler(router, messages.MessagehandlerDeps{
+		Config: conf,
+	})
+
+	department.NewDeportamentHandler(router, department.DepartmenthandlerDeps{
 		Config: conf,
 	})
 

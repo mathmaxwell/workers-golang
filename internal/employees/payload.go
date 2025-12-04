@@ -15,6 +15,37 @@ type GetEmployeesByIdRequest struct {
 	Token string `json:"token" validate:"required"`
 	Id    string `json:"id" validate:"required"`
 }
+type createStatusRequest struct {
+	Token      string `json:"token" validate:"required"`
+	Id         string `json:"id" validate:"required"`
+	Status     string `json:"status"`
+	StartDay   int    `json:"startDay"`
+	StartMonth int    `json:"startMonth"`
+	StartYear  int    `json:"startYear"`
+	EndDay     int    `json:"endDay"`
+	EndMonth   int    `json:"endMonth"`
+	EndYear    int    `json:"endYear"`
+}
+type GetStatusByIdResponse struct {
+	Status     string `json:"status"`
+	StartDay   int    `json:"startDay"`
+	StartMonth int    `json:"startMonth"`
+	StartYear  int    `json:"startYear"`
+	EndDay     int    `json:"endDay"`
+	EndMonth   int    `json:"endMonth"`
+	EndYear    int    `json:"endYear"`
+}
+
+type GetEmployeesByStatusRequest struct {
+	Token  string `json:"token" validate:"required"`
+	Status string `json:"status" validate:"required"`
+	Day    int    `json:"day" validate:"required"`
+	Month  int    `json:"month" validate:"required"`
+	Year   int    `json:"year" validate:"required"`
+}
+type GetEmployeesByStatusResponse struct {
+	Ids []string `json:"ids"`
+}
 
 type GetEmployeesRequest struct {
 	Token     string `json:"token" validate:"required"`

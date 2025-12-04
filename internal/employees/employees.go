@@ -19,7 +19,80 @@ func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) {
 	router.HandleFunc("/employees/getEmployeesById", handler.getEmployeesById())
 	router.HandleFunc("/employees/getLateEmployees", handler.getLateEmployees())
 	router.HandleFunc("/employees/getEmployeesCount", handler.getEmployeesCount())
-	
+	router.HandleFunc("/employees/getStatusById", handler.getStatusById())
+	router.HandleFunc("/employees/createStatus", handler.createStatus())
+	router.HandleFunc("/employees/getEmployeesByStatus", handler.getEmployeesByStatus())
+}
+func (handler *EmployeesHandler) createStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[createStatusRequest](&w, r)
+		if body.Token == "" {
+			return
+		} //проверка токена
+		if err != nil {
+			return
+		}
+		res.Json(w, body, 200)
+	}
+}
+func (handler *EmployeesHandler) getStatusById() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[GetEmployeesByIdRequest](&w, r)
+		if body.Token == "" {
+			return
+		} //проверка токена
+		if err != nil {
+			return
+		}
+
+		data1 := GetStatusByIdResponse{
+			Status:     "on_vacation",
+			StartDay:   5,
+			StartMonth: 11,
+			StartYear:  2025,
+			EndDay:     15,
+			EndMonth:   11,
+			EndYear:    2025,
+		}
+		data2 := GetStatusByIdResponse{
+			Status:     "on_sick_leave",
+			StartDay:   10,
+			StartMonth: 10,
+			StartYear:  2025,
+			EndDay:     20,
+			EndMonth:   10,
+			EndYear:    2025,
+		}
+		data3 := GetStatusByIdResponse{
+			Status:     "on_a_business_trip",
+			StartDay:   3,
+			StartMonth: 9,
+			StartYear:  2025,
+			EndDay:     23,
+			EndMonth:   9,
+			EndYear:    2025,
+		}
+		var data []GetStatusByIdResponse
+		data = append(data, data1)
+		data = append(data, data2)
+		data = append(data, data3)
+		res.Json(w, data, 200)
+	}
+}
+func (handler *EmployeesHandler) getEmployeesByStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[GetEmployeesByStatusRequest](&w, r)
+		if body.Token == "" {
+			return
+		} //проверка токена
+		if err != nil {
+			return
+		}
+		data := GetEmployeesByStatusResponse{
+			Ids: []string{token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId(), token.CreateId()},
+		}
+		res.Json(w, data, 200)
+	}
 }
 func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +169,7 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 		} //ищет по ид
 
 		data := IEmployeesResponse{
-			Id:                         token.CreateId(),
+			Id:                         body.Id,
 			Gender:                     "male",
 			Passport_series_and_number: "AC1234567",
 			PINFL:                      "12345678901234",
@@ -116,7 +189,7 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",
-			Phone_number:               "+998(99)999-88-777",
+			Phone_number:               "+998(99)999-88-77",
 			Work_schedule:              "полный день",
 		}
 
@@ -132,6 +205,7 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 		if err != nil {
 			return
 		}
+
 		//ищет за тех дней кто опоздал и сколько опоздал, график работы
 		var data []IEmployeesResponse
 		data1 := IEmployeesResponse{
@@ -155,7 +229,7 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",
-			Phone_number:               "+998(99)999-88-777",
+			Phone_number:               "+998(99)999-88-77",
 			Work_schedule:              "полный день",
 		}
 		data2 := IEmployeesResponse{
@@ -179,7 +253,7 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",
-			Phone_number:               "+998(99)999-88-777",
+			Phone_number:               "+998(99)999-88-77",
 			Work_schedule:              "полный день",
 		}
 
