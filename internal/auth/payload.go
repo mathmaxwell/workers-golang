@@ -9,10 +9,10 @@ import (
 
 type User struct {
 	gorm.Model
-	Login    string `gorm:"unique"`
-	Password string
-	Token    string
-	UserRole int
+	Login    string `gorm:"unique" json:"login"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+	UserRole int    `json:"userRole"`
 }
 
 type LoginResponse struct {

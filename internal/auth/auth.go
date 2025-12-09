@@ -31,12 +31,13 @@ func (handler *AuthHandler) login() http.HandlerFunc {
 		}
 		var user User
 		err = handler.AuthRepository.DataBase.Where("login = ?", body.Login).First(&user).Error
-		if user.Password != body.Password {
-			res.Json(w, "password is not correct", 400)
+
+		if err != nil {
+			res.Json(w, "user is not found", 400)
 			return
 		}
-		if err != nil {
-			res.Json(w, "not found", 400)
+		if user.Password != body.Password {
+			res.Json(w, "password is not correct", 400)
 			return
 		}
 		res.Json(w, user, 200)
