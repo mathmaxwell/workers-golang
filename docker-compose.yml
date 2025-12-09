@@ -1,12 +1,13 @@
 services:
   postgres:
-    container_name: workers_go
+    container_name: localhost
     image: postgres:16.4
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: my_pass
-      PGDATA: /data/postgres
+      POSTGRES_USER: abdurahim
+      POSTGRES_PASSWORD: qwerty1050
+      POSTGRES_DB: workers
+      PGDATA: /data/workers
     volumes:
-      - ./postgres-data:/data/postgres
+      - ./postgres-data:/data/workers
     ports:
       - '5433:5432'

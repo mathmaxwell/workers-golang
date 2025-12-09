@@ -20,6 +20,7 @@ func main() {
 	mux := cors.Cors(router)
 	//register
 	authRepo := auth.NewUserRepository(database)
+	database.AutoMigrate(&auth.User{}) //создание базу данных
 	auth.NewAuthHandler(router, auth.AuthhandlerDeps{
 		Config:         conf,
 		AuthRepository: authRepo,
@@ -37,7 +38,6 @@ func main() {
 	department.NewDeportamentHandler(router, department.DepartmenthandlerDeps{
 		Config: conf,
 	})
-
 	server := http.Server{
 		Addr:    ":8080",
 		Handler: mux,

@@ -3,7 +3,17 @@ package auth
 import (
 	"demo/purpleSchool/configs"
 	"demo/purpleSchool/pkg/db"
+
+	"gorm.io/gorm"
 )
+
+type User struct {
+	gorm.Model
+	Login    string `gorm:"unique"`
+	Password string
+	Token    string
+	UserRole int
+}
 
 type LoginResponse struct {
 	Token    string `json:"token"`

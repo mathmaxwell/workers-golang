@@ -29,16 +29,17 @@ func (handler *AuthHandler) login() http.HandlerFunc {
 		if err != nil {
 			return
 		}
-		//ищет по логину, если пароль совполает, то дает токен
-		email := body.Login
-		password := body.Password
-		token := token.CreateId()
-		data := LoginResponse{
-			Login:    email,
-			Password: password,
-			Token:    token,
+		var user User
+		err = handler.AuthRepository.DataBase.Where("login = ?", body.Login).First(&user).Error
+		if user.Password != body.Password {
+			res.Json(w, "password is not correct", 400)
+			return
 		}
-		res.Json(w, data, 200)
+		if err != nil {
+			res.Json(w, "not found", 400)
+			return
+		}
+		res.Json(w, user, 200)
 	}
 }
 
@@ -48,15 +49,22 @@ func (handler *AuthHandler) register() http.HandlerFunc {
 		if err != nil {
 			return
 		}
-		//создает новый запись
+		var user User
+		err = handler.AuthRepository.DataBase.Where("login = ?", body.Login).First(&user).Error
+		if err == nil {
+			res.Json(w, "login is alredy exist", 400)
+			return
+		}
 		email := body.Login
 		password := body.Password
 		token := token.CreateId()
-		data := LoginResponse{
+		data := User{
 			Login:    email,
 			Password: password,
 			Token:    token,
+			UserRole: 1,
 		}
+		handler.AuthRepository.DataBase.Create(&data)
 		res.Json(w, data, 200)
 	}
 }
