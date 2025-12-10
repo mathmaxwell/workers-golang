@@ -2,12 +2,12 @@ package employees
 
 import (
 	"demo/purpleSchool/pkg/db"
+	"demo/purpleSchool/pkg/fields"
 	"demo/purpleSchool/pkg/files"
 	"demo/purpleSchool/pkg/req"
 	"demo/purpleSchool/pkg/res"
 	"demo/purpleSchool/pkg/token"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -17,7 +17,7 @@ func NewEmployeeRepository(dataBase *db.Db) *EmployeeRepository {
 	}
 }
 
-func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) {
+func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) *EmployeesHandler {
 	handler := &EmployeesHandler{
 		Config:             deps.Config,
 		EmployeeRepository: *deps.EmployeeRepository,
@@ -33,6 +33,7 @@ func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) {
 	router.HandleFunc("/employees/getStatusById", handler.getStatusById())
 	router.HandleFunc("/employees/createStatus", handler.createStatus())
 	router.HandleFunc("/employees/getEmployeesByStatus", handler.getEmployeesByStatus())
+	return handler
 }
 
 func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
@@ -44,36 +45,24 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			return
 		}
 		if user.UserRole != 1 {
-			res.Json(w, "you are not admin", 401)
+			res.Json(w, "you are not admin", 403)
 			return
 		}
-		if userToken == "" {
-			res.Json(w, "unauthorized", 401)
-			return
-		}
-		file, _, err := r.FormFile("image")
-		if err != nil && file == nil {
-			res.Json(w, "image is not found", 400)
-			return
-		}
-
-		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB макс
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			res.Json(w, "failed to parse form", http.StatusBadRequest)
 			return
 		}
-
-		//  Обработка фото
-		var photoPath string
 		file, header, err := r.FormFile("image")
-		if err == nil && file != nil && header != nil {
-			photoPath, err = files.SaveFile(file, header)
-			if err != nil {
-				res.Json(w, "failed to save image", http.StatusInternalServerError)
-				return
-			}
-			// photoPath будет что-то вроде: uploads/employees/1733723400-photo.jpg
+		if err != nil {
+			res.Json(w, "image is not found", 400)
+			return
 		}
-		newEmployee := Employee{
+		photoPath, err := files.SaveFile(file, header)
+		if err != nil {
+			res.Json(w, "failed to save image", http.StatusInternalServerError)
+			return
+		}
+		newEmployee := IEmployeesResponse{
 			Id:                         token.CreateId(),
 			Gender:                     r.FormValue("gender"),
 			Full_name:                  r.FormValue("full_name"),
@@ -90,11 +79,12 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			Email:                      r.FormValue("Email"),
 			Image:                      photoPath,
 		}
+		if err := fields.ValidateFields(newEmployee, IEmployeesResponse{}); err != nil {
+			res.Json(w, err.Error(), 400)
+			return
+		}
 		if err := handler.EmployeeRepository.DataBase.Create(&newEmployee).Error; err != nil {
-			if photoPath != "" {
-				os.Remove(photoPath)
-			}
-			res.Json(w, "failed to create employee: "+err.Error(), http.StatusInternalServerError)
+			res.Json(w, "db error", 500)
 			return
 		}
 		response := map[string]interface{}{
@@ -105,6 +95,7 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 		res.Json(w, response, 200)
 	}
 }
+
 func (handler *EmployeesHandler) createStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[createStatusRequest](&w, r)
@@ -238,9 +229,9 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 			On_sick_leave:              false,
 			On_a_business_trip:         false,
 			Absence:                    false,
-			Date_of_birth:              9,
-			Birth_month:                2,
-			Year_of_birth:              2003,
+			Date_of_birth:              "9",
+			Birth_month:                "2",
+			Year_of_birth:              "2003",
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",
@@ -278,9 +269,9 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 			On_sick_leave:              false,
 			On_a_business_trip:         false,
 			Absence:                    false,
-			Date_of_birth:              9,
-			Birth_month:                2,
-			Year_of_birth:              2003,
+			Date_of_birth:              "9",
+			Birth_month:                "2",
+			Year_of_birth:              "2003",
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",
@@ -302,9 +293,9 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 			On_sick_leave:              false,
 			On_a_business_trip:         false,
 			Absence:                    false,
-			Date_of_birth:              1,
-			Birth_month:                3,
-			Year_of_birth:              1998,
+			Date_of_birth:              "1",
+			Birth_month:                "3",
+			Year_of_birth:              "1998",
 			Place_of_birth:             "Tashkent",
 			Nationality:                "uzbek",
 			Email:                      "test123@gmail.com",

@@ -15,10 +15,9 @@ import (
 func main() {
 	conf := configs.LoadConfig()
 	database := db.NewDB(conf)
-	//repositories
 	router := http.NewServeMux()
+	router.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 	mux := cors.Cors(router)
-
 	//register
 	authRepo := auth.NewUserRepository(database)
 	database.AutoMigrate(&auth.User{})
@@ -40,14 +39,17 @@ func main() {
 	workschedule.NewWorkScheduleHandler(router, workschedule.WorkScheduleDeps{
 		Config: conf,
 	})
+
 	//message
 	messages.NewMessagesHandler(router, messages.MessagehandlerDeps{
 		Config: conf,
 	})
-	//deportament
+
+	//department
 	department.NewDeportamentHandler(router, department.DepartmenthandlerDeps{
 		Config: conf,
 	})
+
 	server := http.Server{
 		Addr:    ":8080",
 		Handler: mux,

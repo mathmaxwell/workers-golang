@@ -5,9 +5,12 @@ import (
 	"demo/purpleSchool/internal/auth"
 	"demo/purpleSchool/pkg/db"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Employee struct {
+	gorm.Model
 	Id                         string `json:"id" gorm:"primaryKey"`
 	Gender                     string `json:"gender"`
 	Passport_series_and_number string `json:"passport_series_and_number"`
@@ -103,9 +106,9 @@ type IEmployeesResponse struct {
 	On_sick_leave              bool   `json:"on_sick_leave"`
 	On_a_business_trip         bool   `json:"on_a_business_trip"`
 	Absence                    bool   `json:"absence"`
-	Date_of_birth              int    `json:"date_of_birth"`
-	Birth_month                int    `json:"birth_month"`
-	Year_of_birth              int    `json:"year_of_birth"`
+	Date_of_birth              string `json:"date_of_birth"`
+	Birth_month                string `json:"birth_month"`
+	Year_of_birth              string `json:"year_of_birth"`
 	Place_of_birth             string `json:"place_of_birth"`
 	Nationality                string `json:"nationality"`
 	Email                      string `json:"Email"`

@@ -16,9 +16,10 @@ type User struct {
 }
 
 type LoginResponse struct {
-	Token    string `json:"token"`
-	Login    string `json:"login"`
+	Login    string `gorm:"unique" json:"login"`
 	Password string `json:"password"`
+	Token    string `json:"token"`
+	UserRole int    `json:"userRole"`
 }
 type AuthHandler struct {
 	*configs.Config
