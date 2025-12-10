@@ -2,14 +2,48 @@ package employees
 
 import (
 	"demo/purpleSchool/configs"
+	"demo/purpleSchool/internal/auth"
+	"demo/purpleSchool/pkg/db"
 	"time"
 )
 
+type Employee struct {
+	Id                         string `json:"id" gorm:"primaryKey"`
+	Gender                     string `json:"gender"`
+	Passport_series_and_number string `json:"passport_series_and_number"`
+	PINFL                      string `json:"PINFL"`
+	Full_name                  string `json:"full_name"`
+	Image                      string `json:"image"`
+	Department                 string `json:"department"`
+	Position                   string `json:"position"`
+	Terminated                 bool   `json:"terminated"`
+	On_probation               bool   `json:"on_probation"`
+	On_vacation                bool   `json:"on_vacation"`
+	On_sick_leave              bool   `json:"on_sick_leave"`
+	On_a_business_trip         bool   `json:"on_a_business_trip"`
+	Absence                    bool   `json:"absence"`
+	Date_of_birth              string `json:"date_of_birth"`
+	Birth_month                string `json:"birth_month"`
+	Year_of_birth              string `json:"year_of_birth"`
+	Place_of_birth             string `json:"place_of_birth"`
+	Nationality                string `json:"nationality"`
+	Email                      string `json:"Email"`
+	Phone_number               string `json:"phone_number"`
+	Work_schedule              string `json:"work_schedule"`
+}
+type EmployeeRepository struct {
+	DataBase *db.Db
+}
 type EmployeeshandlerDeps struct {
 	*configs.Config
+	EmployeeRepository *EmployeeRepository
+	AuthHandler        *auth.AuthHandler
 }
+
 type EmployeesHandler struct {
 	*configs.Config
+	EmployeeRepository EmployeeRepository
+	AuthHandler        *auth.AuthHandler
 }
 type GetEmployeesByIdRequest struct {
 	Token string `json:"token" validate:"required"`

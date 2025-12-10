@@ -5,6 +5,7 @@ import (
 	"demo/purpleSchool/pkg/req"
 	"demo/purpleSchool/pkg/res"
 	"demo/purpleSchool/pkg/token"
+	"errors"
 	"net/http"
 )
 
@@ -14,15 +15,26 @@ func NewUserRepository(dataBase *db.Db) *AuthRepository {
 	}
 }
 
-func NewAuthHandler(router *http.ServeMux, deps AuthhandlerDeps) {
+func NewAuthHandler(router *http.ServeMux, deps AuthhandlerDeps) *AuthHandler {
 	handler := &AuthHandler{
-		AuthRepository: *deps.AuthRepository,
 		Config:         deps.Config,
+		AuthRepository: *deps.AuthRepository,
 	}
+
 	router.HandleFunc("/users/login", handler.login())
 	router.HandleFunc("/users/register", handler.register())
+
+	return handler
 }
 
+func (handler *AuthHandler) GetUserByToken(token string) (User, error) {
+	var user User
+	err := handler.AuthRepository.DataBase.Where("token = ?", token).First(&user).Error
+	if err != nil {
+		return user, errors.New("user is not found")
+	}
+	return user, nil
+}
 func (handler *AuthHandler) login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[LoginRequest](&w, r)
@@ -43,7 +55,6 @@ func (handler *AuthHandler) login() http.HandlerFunc {
 		res.Json(w, user, 200)
 	}
 }
-
 func (handler *AuthHandler) register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[LoginRequest](&w, r)

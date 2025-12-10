@@ -2,6 +2,7 @@ package main
 
 import (
 	"demo/purpleSchool/internal/auth"
+	"demo/purpleSchool/internal/employees"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -19,4 +20,5 @@ func main() {
 		panic(err)
 	}
 	db.AutoMigrate(&auth.LoginResponse{})
+	db.AutoMigrate(&employees.Employee{})
 }

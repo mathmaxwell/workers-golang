@@ -1,16 +1,27 @@
 package employees
 
 import (
+	"demo/purpleSchool/pkg/db"
+	"demo/purpleSchool/pkg/files"
 	"demo/purpleSchool/pkg/req"
 	"demo/purpleSchool/pkg/res"
 	"demo/purpleSchool/pkg/token"
 	"net/http"
+	"os"
 	"time"
 )
 
+func NewEmployeeRepository(dataBase *db.Db) *EmployeeRepository {
+	return &EmployeeRepository{
+		DataBase: dataBase,
+	}
+}
+
 func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) {
 	handler := &EmployeesHandler{
-		Config: deps.Config,
+		Config:             deps.Config,
+		EmployeeRepository: *deps.EmployeeRepository,
+		AuthHandler:        deps.AuthHandler,
 	}
 	router.HandleFunc("/employees/createEmployees", handler.createEmployees())
 	router.HandleFunc("/employees/updateEmployees", handler.updateEmployees())
@@ -22,6 +33,77 @@ func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) {
 	router.HandleFunc("/employees/getStatusById", handler.getStatusById())
 	router.HandleFunc("/employees/createStatus", handler.createStatus())
 	router.HandleFunc("/employees/getEmployeesByStatus", handler.getEmployeesByStatus())
+}
+
+func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userToken := r.FormValue("token")
+		user, err := handler.AuthHandler.GetUserByToken(userToken)
+		if err != nil {
+			res.Json(w, "user is not found", 401)
+			return
+		}
+		if user.UserRole != 1 {
+			res.Json(w, "you are not admin", 401)
+			return
+		}
+		if userToken == "" {
+			res.Json(w, "unauthorized", 401)
+			return
+		}
+		file, _, err := r.FormFile("image")
+		if err != nil && file == nil {
+			res.Json(w, "image is not found", 400)
+			return
+		}
+
+		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB макс
+			res.Json(w, "failed to parse form", http.StatusBadRequest)
+			return
+		}
+
+		//  Обработка фото
+		var photoPath string
+		file, header, err := r.FormFile("image")
+		if err == nil && file != nil && header != nil {
+			photoPath, err = files.SaveFile(file, header)
+			if err != nil {
+				res.Json(w, "failed to save image", http.StatusInternalServerError)
+				return
+			}
+			// photoPath будет что-то вроде: uploads/employees/1733723400-photo.jpg
+		}
+		newEmployee := Employee{
+			Id:                         token.CreateId(),
+			Gender:                     r.FormValue("gender"),
+			Full_name:                  r.FormValue("full_name"),
+			PINFL:                      r.FormValue("PINFL"),
+			Phone_number:               r.FormValue("phone_number"),
+			Passport_series_and_number: r.FormValue("passport_series_and_number"),
+			Department:                 r.FormValue("department"),
+			Position:                   r.FormValue("position"),
+			Date_of_birth:              r.FormValue("date_of_birth"),
+			Birth_month:                r.FormValue("birth_month"),
+			Year_of_birth:              r.FormValue("year_of_birth"),
+			Place_of_birth:             r.FormValue("place_of_birth"),
+			Nationality:                r.FormValue("nationality"),
+			Email:                      r.FormValue("Email"),
+			Image:                      photoPath,
+		}
+		if err := handler.EmployeeRepository.DataBase.Create(&newEmployee).Error; err != nil {
+			if photoPath != "" {
+				os.Remove(photoPath)
+			}
+			res.Json(w, "failed to create employee: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response := map[string]interface{}{
+			"message":     "employee created successfully",
+			"employee_id": newEmployee.Id,
+			"photo_url":   photoPath,
+		}
+		res.Json(w, response, 200)
+	}
 }
 func (handler *EmployeesHandler) createStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -94,34 +176,7 @@ func (handler *EmployeesHandler) getEmployeesByStatus() http.HandlerFunc {
 		res.Json(w, data, 200)
 	}
 }
-func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userToken := r.FormValue("token")
-		if userToken == "" {
-			res.Json(w, "unauthorized", 401)
-			return
-		}
-		// gender := r.FormValue("gender")
-		// Full_name := r.FormValue("full_name")
-		// PINFL := r.FormValue("PINFL")
-		// phone_number := r.FormValue("phone_number")
-		// passport_series_and_number := r.FormValue("passport_series_and_number")
-		// department := r.FormValue("department")
-		// position := r.FormValue("position")
-		// date_of_birth := r.FormValue("date_of_birth")
-		// birth_month := r.FormValue("birth_month")
-		// year_of_birth := r.FormValue("year_of_birth")
-		// place_of_birth := r.FormValue("place_of_birth")
-		// nationality := r.FormValue("nationality")
-		// Email := r.FormValue("Email")
-		file, header, err := r.FormFile("image")
-		if err == nil && file != nil {
-			res.Json(w, header, 200)
-			return
-		}
-		res.Json(w, "error image", 401)
-	}
-}
+
 func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userToken := r.FormValue("token")
