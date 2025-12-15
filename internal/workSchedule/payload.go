@@ -50,10 +50,18 @@ type updateWorkScheduleRequest struct {
 	ScheduleForDay
 }
 type getWorkScheduleRequest struct {
-	ScheduleForDay
+	Token              string `json:"token" validate:"required"`
+	EmployeeId         string `json:"employeeId"`
+	EndDaySchedule     int    `json:"endDaySchedule"`
+	EndMonthSchedule   int    `json:"endMonthSchedule"`
+	EndYearSchedule    int    `json:"endYearSchedule"`
+	StartMonthSchedule int    `json:"startMonthSchedule"`
+	StartYearSchedule  int    `json:"startYearSchedule"`
+	StartDaySchedule   int    `json:"startDaySchedule"`
 }
 type getWorkScheduleResponse struct {
 	Token              string           `json:"token" validate:"required"`
+	EmployeeId         string           `json:"employeeId"`
 	EndDaySchedule     int              `json:"endDay"`
 	EndMonthSchedule   int              `json:"endMonth"`
 	EndYearSchedule    int              `json:"endYear"`

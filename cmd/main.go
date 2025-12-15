@@ -44,9 +44,13 @@ func main() {
 		AuthHandler:        authHandler,
 	})
 
-	//message
+	//messagex
+	messageRepo := messages.NewMessageRepository(database)
+	database.AutoMigrate(&messages.Message{})
 	messages.NewMessagesHandler(router, messages.MessagehandlerDeps{
-		Config: conf,
+		Config:            conf,
+		MessageRepository: messageRepo,
+		AuthHandler:    authHandler,
 	})
 
 	//department

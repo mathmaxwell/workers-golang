@@ -63,7 +63,7 @@ func (handler *WorkScheduleHandler) createWorkSchedule() http.HandlerFunc {
 
 func (handler *WorkScheduleHandler) getEmployeeWorkSchedule() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := req.HandleBody[getWorkScheduleResponse](&w, r)
+		body, err := req.HandleBody[getWorkScheduleRequest](&w, r)
 		if err != nil {
 			res.Json(w, err.Error(), 400)
 			return
@@ -78,16 +78,31 @@ func (handler *WorkScheduleHandler) getEmployeeWorkSchedule() http.HandlerFunc {
 			return
 		}
 		schedule := []ScheduleForDay{}
-		responce := getWorkScheduleResponse{
+		startDate := body.StartYearSchedule*10000 +
+			body.StartMonthSchedule*100 +
+			body.StartDaySchedule
+		endDate := body.EndYearSchedule*10000 +
+			body.EndMonthSchedule*100 +
+			body.EndDaySchedule
+		db := handler.ScheduleRepository.DataBase
+		db.Model(&ScheduleForDay{}).
+			Where(
+				"(start_year*10000 + start_month*100 + start_day) <= ? AND "+
+					"(end_year*10000 + end_month*100 + end_day) >= ?",
+				endDate,
+				startDate,
+			).Where("employee_id = ?", body.EmployeeId).
+			Find(&schedule)
+		response := getWorkScheduleResponse{
+			StartDaySchedule:   body.StartDaySchedule,
+			StartMonthSchedule: body.StartMonthSchedule,
+			StartYearSchedule:  body.StartYearSchedule,
 			EndDaySchedule:     body.EndDaySchedule,
 			EndMonthSchedule:   body.EndMonthSchedule,
 			EndYearSchedule:    body.EndYearSchedule,
-			StartMonthSchedule: body.StartMonthSchedule,
-			StartYearSchedule:  body.StartYearSchedule,
-			StartDaySchedule:   body.StartDaySchedule,
 			WorkSchedule:       schedule,
 		}
-		res.Json(w, responce, 200)
+		res.Json(w, response, 200)
 	}
 }
 
@@ -95,11 +110,25 @@ func (handler *WorkScheduleHandler) updateWorkSchedule() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[updateWorkScheduleRequest](&w, r)
 		if err != nil {
+			res.Json(w, err.Error(), 400)
 			return
 		}
-		//id это ид содрудника
-		//либо создает, либо меняет. если body.EndHour == body.EndHour==99 -> просто удалит данные. по дням работает, а не по ИД
-
+		user, err := handler.AuthHandler.GetUserByToken(body.Token)
+		if err != nil {
+			res.Json(w, "user is not found", 401)
+			return
+		}
+		if user.UserRole != 1 {
+			res.Json(w, "you are not admin", 403)
+			return
+		}
+		db := handler.ScheduleRepository.DataBase
+		var schedule ScheduleForDay
+		err = db.Where("id = ?", body.Id).First(&schedule).Error
+		if err != nil {
+			res.Json(w, err.Error(), 400)
+		}
+		db.Model(&schedule).Updates(body.ScheduleForDay)
 		res.Json(w, body, 200)
 	}
 }
