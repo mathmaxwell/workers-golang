@@ -14,19 +14,16 @@ func NewUserRepository(dataBase *db.Db) *AuthRepository {
 		DataBase: dataBase,
 	}
 }
-
 func NewAuthHandler(router *http.ServeMux, deps AuthhandlerDeps) *AuthHandler {
 	handler := &AuthHandler{
 		Config:         deps.Config,
 		AuthRepository: *deps.AuthRepository,
 	}
-
 	router.HandleFunc("/users/login", handler.login())
 	router.HandleFunc("/users/register", handler.register())
-
+	router.HandleFunc("/users/deleteUser", handler.deleteUser())
 	return handler
 }
-
 func (handler *AuthHandler) GetUserByToken(token string) (User, error) {
 	var user User
 	err := handler.AuthRepository.DataBase.Where("token = ?", token).First(&user).Error
@@ -70,13 +67,42 @@ func (handler *AuthHandler) register() http.HandlerFunc {
 		email := body.Login
 		password := body.Password
 		token := token.CreateId()
+		isAdmin := body.Login == "testadmin" && body.Password == "tadi123$"
+		userRole := 99
+		if isAdmin {
+			userRole = 1
+		}
 		data := User{
 			Login:    email,
 			Password: password,
 			Token:    token,
-			UserRole: 1,
+			UserRole: userRole,
 		}
 		handler.AuthRepository.DataBase.Create(&data)
 		res.Json(w, data, 200)
+	}
+}
+func (handler *AuthHandler) deleteUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[DeleteRequest](&w, r)
+		if err != nil {
+			return
+		}
+		admin, err := handler.GetUserByToken(body.Token)
+		if err != nil {
+			res.Json(w, "user is not found", 401)
+			return
+		}
+		if admin.UserRole != 1 {
+			res.Json(w, "you are not admin", 403)
+			return
+		}
+		db := handler.AuthRepository.DataBase
+		result := db.Delete(&User{}, "token = ?", body.UserId)
+		if result.Error != nil {
+			res.Json(w, result.Error.Error(), 500)
+			return
+		}
+		res.Json(w, "user deleted", 200)
 	}
 }

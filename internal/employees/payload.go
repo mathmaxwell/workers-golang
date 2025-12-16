@@ -26,6 +26,7 @@ type Employee struct {
 	Email                      string `json:"Email"`
 	Phone_number               string `json:"phone_number"`
 	Work_schedule              string `json:"work_schedule"`
+	Accepted                   bool   `json:"accepted"`
 }
 type EmployeeStatus struct {
 	gorm.Model

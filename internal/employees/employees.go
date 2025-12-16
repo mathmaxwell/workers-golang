@@ -28,6 +28,7 @@ func NewEmployeeHandler(router *http.ServeMux, deps EmployeeshandlerDeps) *Emplo
 	router.HandleFunc("/employees/createEmployees", handler.createEmployees())
 	router.HandleFunc("/employees/updateEmployees", handler.updateEmployees())
 	router.HandleFunc("/employees/getEmployees", handler.getEmployees())
+	router.HandleFunc("/employees/deleteEmployee", handler.deleteEmployee())
 	router.HandleFunc("/employees/getLateEmployeesById", handler.getLateEmployeesById())
 	router.HandleFunc("/employees/getEmployeesById", handler.getEmployeesById())
 	router.HandleFunc("/employees/getLateEmployees", handler.getLateEmployees())
@@ -46,10 +47,15 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			res.Json(w, "user is not found", 401)
 			return
 		}
-		if user.UserRole != 1 {
-			res.Json(w, "you are not admin", 403)
-			return
+		var Accepted bool = false
+		if user.UserRole == 1 {
+			Accepted = true
 		}
+		var token string = token.CreateId()
+		if user.UserRole != 1 {
+			token = userToken
+		}
+
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			res.Json(w, "failed to parse form", http.StatusBadRequest)
 			return
@@ -64,8 +70,9 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			res.Json(w, "failed to save image", http.StatusInternalServerError)
 			return
 		}
+
 		newEmployee := Employee{
-			Id:                         token.CreateId(),
+			Id:                         token,
 			Gender:                     r.FormValue("gender"),
 			Full_name:                  r.FormValue("full_name"),
 			PINFL:                      r.FormValue("PINFL"),
@@ -80,6 +87,7 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			Nationality:                r.FormValue("nationality"),
 			Email:                      r.FormValue("Email"),
 			Image:                      photoPath,
+			Accepted:                   Accepted,
 		}
 		if err := fields.ValidateFields(newEmployee, Employee{}); err != nil {
 			res.Json(w, err.Error(), 400)
@@ -104,15 +112,6 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 			res.Json(w, err.Error(), 400)
 			return
 		}
-		user, err := handler.AuthHandler.GetUserByToken(body.Token)
-		if err != nil {
-			res.Json(w, "user is not found", 401)
-			return
-		}
-		if user.UserRole != 1 {
-			res.Json(w, "you are not admin", 403)
-			return
-		}
 		var employee Employee
 		err = handler.EmployeeRepository.DataBase.Where("id = ?", body.Id).First(&employee).Error
 		if err != nil {
@@ -122,6 +121,7 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 		res.Json(w, employee, 200)
 	}
 }
+
 func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[GetEmployeesRequest](&w, r)
@@ -173,6 +173,35 @@ func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 			return
 		}
 		res.Json(w, employees, 200)
+	}
+}
+func (handler *EmployeesHandler) deleteEmployee() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[GetEmployeesByIdRequest](&w, r)
+		if err != nil {
+			res.Json(w, err.Error(), 400)
+			return
+		}
+		user, err := handler.AuthHandler.GetUserByToken(body.Token)
+		if err != nil {
+			res.Json(w, "user is not found", 401)
+			return
+		}
+		if user.UserRole != 1 {
+			res.Json(w, "you are not admin", 403)
+			return
+		}
+		db := handler.EmployeeRepository.DataBase
+		result := db.Delete(&Employee{}, "id = ?", body.Id)
+		if result.Error != nil {
+			res.Json(w, result.Error.Error(), 500)
+			return
+		}
+		if result.RowsAffected == 0 {
+			res.Json(w, "employee not found", 404)
+			return
+		}
+		res.Json(w, "employee deleted", 200)
 	}
 }
 func (handler *EmployeesHandler) getEmployeesCount() http.HandlerFunc {
@@ -238,6 +267,8 @@ func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 			return
 		}
 		employeeId := r.FormValue("id")
+		acceptedStr := r.FormValue("accepted")
+		accepted := acceptedStr == "true"
 		var employee Employee
 		err = handler.EmployeeRepository.DataBase.Where("id = ?", employeeId).First(&employee).Error
 		if err != nil {
@@ -259,6 +290,7 @@ func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 		} else {
 			photoPath = employee.Image
 		}
+
 		newEmployee := Employee{
 			Id:                         employeeId,
 			Gender:                     fields.GetOrDefault(r.FormValue("gender"), employee.Gender),
@@ -275,6 +307,7 @@ func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 			Nationality:                fields.GetOrDefault(r.FormValue("nationality"), employee.Nationality),
 			Email:                      fields.GetOrDefault(r.FormValue("Email"), employee.Email),
 			Image:                      photoPath,
+			Accepted:                   accepted,
 		}
 		handler.EmployeeRepository.DataBase.Model(&employee).Updates(newEmployee)
 		res.Json(w, "employee updated successfully", 200)

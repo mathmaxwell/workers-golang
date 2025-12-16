@@ -50,12 +50,15 @@ func main() {
 	messages.NewMessagesHandler(router, messages.MessagehandlerDeps{
 		Config:            conf,
 		MessageRepository: messageRepo,
-		AuthHandler:    authHandler,
+		AuthHandler:       authHandler,
 	})
 
 	//department
+	deportamentRepo := department.NewDeportamentRepository(database)
+	database.AutoMigrate(&department.Department{})
 	department.NewDeportamentHandler(router, department.DepartmenthandlerDeps{
-		Config: conf,
+		Config:                conf,
+		DeportamentRepository: deportamentRepo,
 	})
 
 	server := http.Server{

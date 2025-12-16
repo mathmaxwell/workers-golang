@@ -2,6 +2,7 @@ package main
 
 import (
 	"demo/purpleSchool/internal/auth"
+	"demo/purpleSchool/internal/department"
 	"demo/purpleSchool/internal/employees"
 	"demo/purpleSchool/internal/messages"
 	workschedule "demo/purpleSchool/internal/workSchedule"
@@ -26,4 +27,5 @@ func main() {
 	db.AutoMigrate(&employees.EmployeeStatus{})
 	db.AutoMigrate(&workschedule.ScheduleForDay{})
 	db.AutoMigrate(&messages.Message{})
+	db.AutoMigrate(&department.Department{})
 }
