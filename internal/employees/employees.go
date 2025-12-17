@@ -8,9 +8,12 @@ import (
 	"demo/purpleSchool/pkg/req"
 	"demo/purpleSchool/pkg/res"
 	"demo/purpleSchool/pkg/token"
+	"errors"
 	"fmt"
 	"net/http"
-	"time"
+	"strconv"
+
+	"gorm.io/gorm"
 )
 
 func NewEmployeeRepository(dataBase *db.Db) *EmployeeRepository {
@@ -97,12 +100,7 @@ func (handler *EmployeesHandler) createEmployees() http.HandlerFunc {
 			res.Json(w, "db error", 500)
 			return
 		}
-		response := map[string]interface{}{
-			"message":     "employee created successfully",
-			"employee_id": newEmployee.Id,
-			"photo_url":   photoPath,
-		}
-		res.Json(w, response, 200)
+		res.Json(w, newEmployee, 200)
 	}
 }
 func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
@@ -121,7 +119,6 @@ func (handler *EmployeesHandler) getEmployeesById() http.HandlerFunc {
 		res.Json(w, employee, 200)
 	}
 }
-
 func (handler *EmployeesHandler) getEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[GetEmployeesRequest](&w, r)
@@ -256,43 +253,56 @@ func (handler *EmployeesHandler) getEmployeesCount() http.HandlerFunc {
 } //absence is not ready
 func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			res.Json(w, "не удалось разобрать форму", http.StatusBadRequest)
+			return
+		}
 		userToken := r.FormValue("token")
+		if userToken == "" {
+			res.Json(w, "токен обязателен", http.StatusUnauthorized)
+			return
+		}
 		user, err := handler.AuthHandler.GetUserByToken(userToken)
 		if err != nil {
-			res.Json(w, "user is not found", 401)
+			res.Json(w, "пользователь не найден или токен недействителен", http.StatusUnauthorized)
 			return
 		}
 		if user.UserRole != 1 {
-			res.Json(w, "you are not admin", 403)
+			res.Json(w, "доступ запрещён: требуется роль администратора", http.StatusForbidden)
 			return
 		}
 		employeeId := r.FormValue("id")
+		if employeeId == "" {
+			res.Json(w, "ID сотрудника обязателен", http.StatusBadRequest)
+			return
+		}
 		acceptedStr := r.FormValue("accepted")
-		accepted := acceptedStr == "true"
-		var employee Employee
-		err = handler.EmployeeRepository.DataBase.Where("id = ?", employeeId).First(&employee).Error
+		accepted, err := strconv.ParseBool(acceptedStr)
 		if err != nil {
-			res.Json(w, "employee is not found", 400)
+			res.Json(w, "accepted должен быть true или false", http.StatusBadRequest)
 			return
 		}
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			res.Json(w, "failed to parse form", http.StatusBadRequest)
+		var employee Employee
+		if err := handler.EmployeeRepository.DataBase.Where("id = ?", employeeId).First(&employee).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				res.Json(w, "сотрудник не найден", http.StatusNotFound)
+			} else {
+				res.Json(w, "ошибка базы данных", http.StatusInternalServerError)
+			}
 			return
 		}
-		var photoPath string
+		photoPath := employee.Image
 		file, header, err := r.FormFile("image")
 		if err == nil && file != nil {
-			photoPath, err = files.SaveFile(file, header)
-			if err != nil {
-				res.Json(w, "failed to save image", 500)
+			defer file.Close()
+			var saveErr error
+			photoPath, saveErr = files.SaveFile(file, header)
+			if saveErr != nil {
+				res.Json(w, "не удалось сохранить изображение", http.StatusInternalServerError)
 				return
 			}
-		} else {
-			photoPath = employee.Image
 		}
-
-		newEmployee := Employee{
-			Id:                         employeeId,
+		updatedEmployee := Employee{
 			Gender:                     fields.GetOrDefault(r.FormValue("gender"), employee.Gender),
 			Full_name:                  fields.GetOrDefault(r.FormValue("full_name"), employee.Full_name),
 			PINFL:                      fields.GetOrDefault(r.FormValue("PINFL"), employee.PINFL),
@@ -309,11 +319,16 @@ func (handler *EmployeesHandler) updateEmployees() http.HandlerFunc {
 			Image:                      photoPath,
 			Accepted:                   accepted,
 		}
-		handler.EmployeeRepository.DataBase.Model(&employee).Updates(newEmployee)
-		res.Json(w, "employee updated successfully", 200)
+		if err := handler.EmployeeRepository.DataBase.Model(&employee).Updates(updatedEmployee).Error; err != nil {
+			res.Json(w, "не удалось обновить сотрудника", http.StatusInternalServerError)
+			return
+		}
+		res.Json(w, map[string]interface{}{
+			"message":  "сотрудник успешно обновлён",
+			"employee": updatedEmployee,
+		}, http.StatusOK)
 	}
 }
-
 func (handler *EmployeesHandler) createStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[createStatusRequest](&w, r)
@@ -373,7 +388,6 @@ func (handler *EmployeesHandler) getStatusById() http.HandlerFunc {
 		res.Json(w, employeeStatusHistory, 200)
 	}
 }
-
 func (handler *EmployeesHandler) getEmployeesByStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[GetEmployeesByStatusRequest](&w, r)
@@ -415,126 +429,6 @@ func (handler *EmployeesHandler) getLateEmployeesById() http.HandlerFunc {
 		}
 		//ищет за тех дней кто опоздал и сколько опоздал, график работы
 		var data []workschedule.ITardinessHistory
-		data1 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "Abdurahim Id",
-			FullName:    "Abdurahim",
-			Department:  "tad Industries",
-			Day:         1,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   9,
-			EntryMinute: 20,
-			EntryDay:    1,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    18,
-			ExitMinute:  0,
-			ExitDay:     1,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   1,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     1,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data2 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "Abdurahim Id",
-			FullName:    "Abdurahim",
-			Department:  "tad Industries",
-			Day:         2,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   8,
-			EntryMinute: 55,
-			EntryDay:    2,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    18,
-			ExitMinute:  5,
-			ExitDay:     2,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   2,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     2,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data3 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "Abdurahim Id",
-			FullName:    "Abdurahim",
-			Department:  "tad Industries",
-			Day:         3,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   9,
-			EntryMinute: 5,
-			EntryDay:    2,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    18,
-			ExitMinute:  0,
-			ExitDay:     3,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   2,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     2,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data4 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "Abdurahim Id",
-			FullName:    "Abdurahim",
-			Department:  "tad Industries",
-			Day:         4,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   10,
-			EntryMinute: 0,
-			EntryDay:    2,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    20,
-			ExitMinute:  0,
-			ExitDay:     4,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   2,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     2,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data = append(data, data1)
-		data = append(data, data2)
-		data = append(data, data3)
-		data = append(data, data4)
 		res.Json(w, data, 200)
 	}
 }
@@ -549,66 +443,7 @@ func (handler *EmployeesHandler) getLateEmployees() http.HandlerFunc {
 		}
 		//ищет за тех дней кто опоздал и сколько опоздал, график работы
 		var data []workschedule.ITardinessHistory
-		data1 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "Abdurahim Id",
-			FullName:    "Abdurahim",
-			Department:  "tad Industries",
-			Day:         body.Start_day,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   9,
-			EntryMinute: 20,
-			EntryDay:    body.Start_day,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    18,
-			ExitMinute:  0,
-			ExitDay:     body.Start_day,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   body.Start_day,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     body.Start_day,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data2 := workschedule.ITardinessHistory{
-			Date:        time.Now().AddDate(0, 0, 0),
-			Id:          "employes Id",
-			FullName:    "employes",
-			Department:  "TADI",
-			Day:         body.Start_day,
-			Month:       body.Start_month,
-			Year:        body.Start_year,
-			EntryHour:   9,
-			EntryMinute: 15,
-			EntryDay:    body.Start_day,
-			EntryMonth:  body.Start_month,
-			EntryYear:   body.Start_year,
-			ExitHour:    18,
-			ExitMinute:  0,
-			ExitDay:     body.Start_day,
-			ExitMonth:   body.Start_month,
-			ExitYear:    body.Start_year,
-			WorkSchedule: workschedule.ScheduleForDay{
-				StartHour:  9,
-				StartDay:   body.Start_day,
-				StartMonth: body.Start_month,
-				StartYear:  body.Start_year,
-				EndHour:    18,
-				EndDay:     body.Start_day,
-				EndMonth:   body.Start_month,
-				EndYear:    body.Start_year,
-			},
-		}
-		data = append(data, data1)
-		data = append(data, data2)
+
 		res.Json(w, data, 200)
 	}
 }

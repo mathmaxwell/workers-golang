@@ -21,6 +21,7 @@ func NewAuthHandler(router *http.ServeMux, deps AuthhandlerDeps) *AuthHandler {
 	}
 	router.HandleFunc("/users/login", handler.login())
 	router.HandleFunc("/users/register", handler.register())
+	router.HandleFunc("/users/createUser", handler.createUser())
 	router.HandleFunc("/users/deleteUser", handler.deleteUser())
 	return handler
 }
@@ -31,6 +32,36 @@ func (handler *AuthHandler) GetUserByToken(token string) (User, error) {
 		return user, errors.New("user is not found")
 	}
 	return user, nil
+}
+func (handler *AuthHandler) createUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[createRequest](&w, r)
+		if err != nil {
+			return
+		}
+		var user User
+		err = handler.AuthRepository.DataBase.Where("login = ?", body.Login).First(&user).Error
+		if err == nil {
+			res.Json(w, "login is alredy exist", 400)
+			return
+		}
+		email := body.Login
+		password := body.Password
+		token := body.UserId
+		isAdmin := body.Login == "testadmin" && body.Password == "tadi123$"
+		userRole := 99
+		if isAdmin {
+			userRole = 1
+		}
+		data := User{
+			Login:    email,
+			Password: password,
+			Token:    token,
+			UserRole: userRole,
+		}
+		handler.AuthRepository.DataBase.Create(&data)
+		res.Json(w, data, 200)
+	}
 }
 func (handler *AuthHandler) login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

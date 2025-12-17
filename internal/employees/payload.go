@@ -62,13 +62,7 @@ type GetEmployeesByIdRequest struct {
 type createStatusRequest struct {
 	Token      string `json:"token" validate:"required"`
 	EmployeeId string `json:"employeeId" validate:"required"`
-	Status     string `json:"status"`
-	StartDay   int    `json:"startDay"`
-	StartMonth int    `json:"startMonth"`
-	StartYear  int    `json:"startYear"`
-	EndDay     int    `json:"endDay"`
-	EndMonth   int    `json:"endMonth"`
-	EndYear    int    `json:"endYear"`
+	GetStatusByIdResponse
 }
 type GetStatusByIdResponse struct {
 	Status     string `json:"status"`
@@ -115,16 +109,6 @@ type getLateEmployeesByIdRequest struct {
 	End_year    int    `json:"endYear" validate:"required"`
 	Start_month int    `json:"startMonth" validate:"required"`
 	Start_year  int    `json:"startYear" validate:"required"`
-}
-type GetLateEmployeesResponse struct {
-	Terminated         int `json:"terminated"`
-	On_probation       int `json:"on_probation"`
-	Active_employees   int `json:"active_employees"`
-	On_vacation        int `json:"on_vacation"`
-	On_sick_leave      int `json:"on_sick_leave"`
-	On_a_business_trip int `json:"on_a_business_trip"`
-	Absence            int `json:"absence"`
-	Total_employees    int `json:"total_employees"`
 }
 
 type IEmployeesCountRequest struct {

@@ -5,7 +5,10 @@ import (
 	"demo/purpleSchool/pkg/req"
 	"demo/purpleSchool/pkg/res"
 	"demo/purpleSchool/pkg/token"
+	"errors"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 func NewDeportamentRepository(dataBase *db.Db) *DeportamentRepository {
@@ -27,11 +30,36 @@ func (handler *Departmenthandler) createDepartment() http.HandlerFunc {
 		if err != nil {
 			return
 		}
+
+		// Проверяем, есть ли уже департамент с таким именем
+		var existing Department
+		err = handler.DeportamentRepository.DataBase.Where("name = ?", body.Name).First(&existing).Error
+		if err == nil {
+			// запись найдена → ошибка
+			res.Json(w, map[string]string{
+				"error": "департамент с таким именем уже существует",
+			}, 400)
+			return
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// ошибка базы данных
+			res.Json(w, map[string]string{
+				"error": "ошибка базы данных",
+			}, 500)
+			return
+		}
+
+		// Создаем новый департамент
 		newDeportament := Department{
 			Name: body.Name,
 			Id:   token.CreateId(),
 		}
-		handler.DeportamentRepository.DataBase.Create(&newDeportament)
+		if err := handler.DeportamentRepository.DataBase.Create(&newDeportament).Error; err != nil {
+			res.Json(w, map[string]string{
+				"error": "не удалось создать департамент",
+			}, 500)
+			return
+		}
+
 		res.Json(w, newDeportament, 200)
 	}
 }
@@ -45,9 +73,12 @@ func (handler *Departmenthandler) getDepartment() http.HandlerFunc {
 		var data []Department
 		err = handler.DeportamentRepository.DataBase.Find(&data).Error
 		if err != nil {
-			res.Json(w, err, 200)
+			res.Json(w, map[string]string{
+				"error": "ошибка базы данных",
+			}, 500)
 			return
 		}
+
 		res.Json(w, data, 200)
 	}
 }
