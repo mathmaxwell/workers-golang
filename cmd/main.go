@@ -6,7 +6,8 @@ import (
 	"demo/purpleSchool/internal/department"
 	"demo/purpleSchool/internal/employees"
 	"demo/purpleSchool/internal/messages"
-	"demo/purpleSchool/internal/workSchedule"
+	"demo/purpleSchool/internal/records"
+	workschedule "demo/purpleSchool/internal/workSchedule"
 	"demo/purpleSchool/pkg/cors"
 	"demo/purpleSchool/pkg/db"
 	"net/http"
@@ -29,7 +30,7 @@ func main() {
 	employeeRepo := employees.NewEmployeeRepository(database)
 	database.AutoMigrate(&employees.Employee{})
 	database.AutoMigrate(&employees.EmployeeStatus{})
-	employees.NewEmployeeHandler(router, employees.EmployeeshandlerDeps{
+	employeesHandler := employees.NewEmployeeHandler(router, employees.EmployeeshandlerDeps{
 		Config:             conf,
 		EmployeeRepository: employeeRepo,
 		AuthHandler:        authHandler,
@@ -60,7 +61,13 @@ func main() {
 		Config:                conf,
 		DeportamentRepository: deportamentRepo,
 	})
-
+	recordRepo := records.NewRecordRepository(database)
+	database.AutoMigrate(&records.Record{})
+	records.NewRecordHandler(router, records.RecordhandlerDeps{
+		Config:             conf,
+		RecordRepository:   recordRepo,
+		EmployeeRepository: employeesHandler,
+	})
 	server := http.Server{
 		Addr:    ":8080",
 		Handler: mux,

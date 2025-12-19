@@ -4,6 +4,7 @@ import (
 	"demo/purpleSchool/configs"
 	"demo/purpleSchool/internal/auth"
 	"demo/purpleSchool/pkg/db"
+	"strconv"
 
 	"gorm.io/gorm"
 )
@@ -115,7 +116,9 @@ type GetLateEmployeesRequest struct {
 }
 type getLateEmployeesByIdRequest struct {
 	Token       string `json:"token" validate:"required"`
-	Id          string `json:"id" validate:"required"`
+	EmployeeId  string `json:"employeeId" validate:"required"`
+	End_day     int    `json:"endDay" validate:"required"`
+	Start_day   int    `json:"startDay" validate:"required"`
 	End_month   int    `json:"endMonth" validate:"required"`
 	End_year    int    `json:"endYear" validate:"required"`
 	Start_month int    `json:"startMonth" validate:"required"`
@@ -137,4 +140,50 @@ type IEmployeesCountResponse struct {
 	On_a_business_trip int `json:"on_a_business_trip"`
 	Absence            int `json:"absence"`
 	Total_employees    int `json:"total_employees"`
+}
+type Record struct {
+	Id          string `json:"id"`
+	EmployeeId  string `json:"employeeId"`
+	Image       string `json:"image"`
+	Year        string `json:"year"`
+	Month       string `json:"month"`
+	Day         string `json:"day"`
+	Hour        string `json:"hour"`
+	Minute      string `json:"minute"`
+	Second      string `json:"second"`
+	Description string `json:"description"`
+}
+type ITardinessHistory struct {
+	EmployeeId   string         `json:"employeeId"`
+	Year         string         `json:"year"`
+	Month        string         `json:"month"`
+	Day          string         `json:"day"`
+	EntryHour    int            `json:"entryHour"`
+	EntryMinute  int            `json:"entryMinute"`
+	EntryDay     int            `json:"entryDay"`
+	EntryMonth   int            `json:"entryMonth"`
+	EntryYear    int            `json:"entryYear"`
+	ExitHour     int            `json:"exitHour"`
+	ExitMinute   int            `json:"exitMinute"`
+	ExitDay      int            `json:"exitDay"`
+	ExitMonth    int            `json:"exitMonth"`
+	ExitYear     int            `json:"exitYear"`
+	WorkSchedule ScheduleForDay `json:"workSchedule"`
+}
+type ScheduleForDay struct {
+	Id         string `json:"id"`
+	EmployeeId string `json:"employeeId"`
+	StartHour  int    `json:"startHour"`
+	StartDay   int    `json:"startDay"`
+	StartMonth int    `json:"startMonth"`
+	StartYear  int    `json:"startYear"`
+	EndHour    int    `json:"endHour"`
+	EndDay     int    `json:"endDay"`
+	EndMonth   int    `json:"endMonth"`
+	EndYear    int    `json:"endYear"`
+}
+
+func toInt(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
 }
