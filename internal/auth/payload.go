@@ -39,6 +39,12 @@ type createRequest struct {
 	Password string `json:"password" validate:"required"`
 	UserId   string `json:"userId"`
 }
+type updateRequest struct {
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+	UserId   string `json:"userId"`
+	UserRole int    `json:"userRole"`
+}
 type DeleteRequest struct {
 	Token  string `json:"token"`
 	UserId string `json:"userId"`

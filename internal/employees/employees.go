@@ -48,7 +48,6 @@ func (handler *EmployeesHandler) GetEmpById(id string) (Employee, error) {
 	if err != nil {
 		return employee, errors.New("user is not found")
 	}
-
 	return employee, nil
 }
 
@@ -285,6 +284,7 @@ func (handler *EmployeesHandler) getEmployeesCount() http.HandlerFunc {
 		var schedulesForDay []workschedule.ScheduleForDay
 		db.Model(&workschedule.ScheduleForDay{}).Where("start_day + start_month*100 + start_year*1000 = ?", targetDate).Find(&schedulesForDay)
 		absence := 0
+		active_employees := len(schedulesForDay)
 		for _, value := range schedulesForDay {
 			var count int64
 			db.Model(&Record{}).
@@ -295,6 +295,7 @@ func (handler *EmployeesHandler) getEmployeesCount() http.HandlerFunc {
 				absence++
 			}
 		}
+
 		db.Model(&Employee{}).Count(&total)
 		data := IEmployeesCountResponse{
 			On_vacation:        int(onVacation),
@@ -302,6 +303,7 @@ func (handler *EmployeesHandler) getEmployeesCount() http.HandlerFunc {
 			On_a_business_trip: int(onBusinessTrip),
 			Absence:            int(absence),
 			Total_employees:    int(total),
+			Active_employees:   int(active_employees),
 		}
 		res.Json(w, data, 200)
 	}
@@ -454,26 +456,66 @@ func (handler *EmployeesHandler) getEmployeesByStatus() http.HandlerFunc {
 			return
 		}
 		db := handler.EmployeeRepository.DataBase
-		targetDate := body.Day + body.Month*100 + body.Year*1000
+		target := body.Day + body.Month*100 + body.Year*10000
 		var ids []string
 		if body.Status == "absence" {
-			var schedulesForDay []workschedule.ScheduleForDay
-			db.Model(&workschedule.ScheduleForDay{}).Where("start_day + start_month*100 + start_year*1000 = ?", targetDate).Find(&schedulesForDay)
-			for _, value := range schedulesForDay {
+			var schedules []workschedule.ScheduleForDay
+			err = db.Model(&workschedule.ScheduleForDay{}).
+				Where(
+					"start_day + start_month*100 + start_year*10000 <= ? AND end_day + end_month*100 + end_year*10000 >= ?",
+					target, target,
+				).
+				Find(&schedules).Error
+			if err != nil {
+				res.Json(w, err.Error(), 500)
+				return
+			}
+			unique := make(map[string]bool)
+			for _, schedule := range schedules {
 				var count int64
-				db.Model(&Record{}).
-					Where("employee_id = ?", value.EmployeeId).
-					Where("day::int + month::int*100 + year::int*1000 = ?", targetDate).
-					Count(&count)
+				err = db.Model(&Record{}).
+					Where("employee_id = ?", schedule.EmployeeId).
+					Where(
+						"day::int + month::int*100 + year::int*10000 = ?",
+						target,
+					).
+					Count(&count).Error
+				if err != nil {
+					res.Json(w, err.Error(), 500)
+					return
+				}
 				if count == 0 {
-					ids = append(ids, value.EmployeeId)
+					unique[schedule.EmployeeId] = true
 				}
 			}
+			ids = make([]string, 0, len(unique))
+			for id := range unique {
+				ids = append(ids, id)
+			}
+		} else if body.Status == "active_employees" {
+			var schedules []workschedule.ScheduleForDay
+			err = db.Model(&workschedule.ScheduleForDay{}).
+				Where(
+					"start_day + start_month*100 + start_year*10000 <= ? AND end_day + end_month*100 + end_year*10000 >= ?",
+					target, target,
+				).
+				Find(&schedules).Error
+			ids = make([]string, 0, len(schedules))
+			for _, value := range schedules {
+				ids = append(ids, value.EmployeeId)
+			}
+			if err != nil {
+				res.Json(w, err.Error(), 500)
+				return
+			}
+			res.Json(w, ids, 200)
+			return
 		} else {
-			db.Model(&EmployeeStatus{}).Select("EmployeeId").
+			db.Model(&EmployeeStatus{}).
+				Select("employee_id").
 				Where("status = ?", body.Status).
-				Where("start_day + start_month*100 + start_year*1000 <= ?", targetDate).
-				Where("end_day + end_month*100 + end_year*1000 >= ?", targetDate).
+				Where("start_day + start_month*100 + start_year*10000 <= ?", target).
+				Where("end_day + end_month*100 + end_year*10000 >= ?", target).
 				Find(&ids)
 		}
 		res.Json(w, ids, 200)
@@ -571,18 +613,94 @@ func (handler *EmployeesHandler) getLateEmployeesById() http.HandlerFunc {
 		res.Json(w, result, 200)
 	}
 }
-
 func (handler *EmployeesHandler) getLateEmployees() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[GetLateEmployeesRequest](&w, r)
-		if body.Token == "" {
-			return
-		} //проверка токена
 		if err != nil {
+			res.Json(w, err, 400)
 			return
 		}
-		//ищет за тех дней кто опоздал и сколько опоздал, график работы
-		var data []workschedule.ITardinessHistory
-		res.Json(w, data, 200)
+		targetStart := body.Start_day + body.Start_month*100 + body.Start_year*10000
+		targetEnd := body.End_day + body.End_month*100 + body.End_year*10000
+		db := handler.EmployeeRepository.DataBase
+		var schedules []workschedule.ScheduleForDay
+		err = db.Model(&workschedule.ScheduleForDay{}).
+			Where("start_day + start_month*100 + start_year*10000 >= ? AND start_day + start_month*100 + start_year*10000 <= ?",
+				targetStart, targetEnd).
+			Find(&schedules).Error
+		if err != nil {
+			res.Json(w, err.Error(), 500)
+			return
+		}
+		result := make([]ITardinessHistory, 0, len(schedules))
+		for _, schedule := range schedules {
+			dayStart := schedule.StartDay + schedule.StartMonth*100 + schedule.StartYear*10000
+			dayEnd := schedule.EndDay + schedule.EndMonth*100 + schedule.EndYear*10000
+			var records []Record
+			err = db.Model(&Record{}).
+				Where("employee_id = ?", schedule.EmployeeId).
+				Where("day::int + month::int*100 + year::int*10000 >= ? AND day::int + month::int*100 + year::int*10000 <= ?",
+					dayStart, dayEnd).
+				Find(&records).Error
+			if err != nil {
+				res.Json(w, err.Error(), 500)
+				return
+			}
+			sort.Slice(records, func(i, j int) bool {
+				dateI := toInt(records[i].Year)*10000 + toInt(records[i].Month)*100 + toInt(records[i].Day)
+				dateJ := toInt(records[j].Year)*10000 + toInt(records[j].Month)*100 + toInt(records[j].Day)
+				if dateI != dateJ {
+					return dateI < dateJ
+				}
+				timeI := toInt(records[i].Hour)*3600 + toInt(records[i].Minute)*60 + toInt(records[i].Second)
+				timeJ := toInt(records[j].Hour)*3600 + toInt(records[j].Minute)*60 + toInt(records[j].Second)
+				return timeI < timeJ
+			})
+			history := ITardinessHistory{
+				EmployeeId: schedule.EmployeeId,
+				Year:       strconv.Itoa(schedule.StartYear),
+				Month:      strconv.Itoa(schedule.StartMonth),
+				Day:        strconv.Itoa(schedule.StartDay),
+				WorkSchedule: ScheduleForDay{
+					Id:         schedule.Id,
+					EmployeeId: schedule.EmployeeId,
+					StartHour:  schedule.StartHour,
+					StartDay:   schedule.StartDay,
+					StartMonth: schedule.StartMonth,
+					StartYear:  schedule.StartYear,
+					EndHour:    schedule.EndHour,
+					EndDay:     schedule.EndDay,
+					EndMonth:   schedule.EndMonth,
+					EndYear:    schedule.EndYear,
+				},
+			}
+			if len(records) == 0 {
+				history.EntryHour = 99
+				history.EntryMinute = 99
+				history.EntryDay = schedule.StartDay
+				history.EntryMonth = schedule.StartMonth
+				history.EntryYear = schedule.StartYear
+				history.ExitHour = 99
+				history.ExitMinute = 99
+				history.ExitDay = schedule.EndDay
+				history.ExitMonth = schedule.EndMonth
+				history.ExitYear = schedule.EndYear
+			} else {
+				first := records[0]
+				history.EntryHour = toInt(first.Hour)
+				history.EntryMinute = toInt(first.Minute)
+				history.EntryDay = toInt(first.Day)
+				history.EntryMonth = toInt(first.Month)
+				history.EntryYear = toInt(first.Year)
+				last := records[len(records)-1]
+				history.ExitHour = toInt(last.Hour)
+				history.ExitMinute = toInt(last.Minute)
+				history.ExitDay = toInt(last.Day)
+				history.ExitMonth = toInt(last.Month)
+				history.ExitYear = toInt(last.Year)
+			}
+			result = append(result, history)
+		}
+		res.Json(w, result, 200)
 	}
 }

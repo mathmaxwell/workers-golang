@@ -31,6 +31,10 @@ func (handler *WorkScheduleHandler) createWorkSchedule() http.HandlerFunc {
 			res.Json(w, err.Error(), 400)
 			return
 		}
+		if body.StartHour == 99 && body.EndHour == 99 {
+			res.Json(w, "not created", 400)
+			return
+		}
 		user, err := handler.AuthHandler.GetUserByToken(body.Token)
 		if err != nil {
 			res.Json(w, "user is not found", 401)
@@ -123,6 +127,11 @@ func (handler *WorkScheduleHandler) updateWorkSchedule() http.HandlerFunc {
 			return
 		}
 		db := handler.ScheduleRepository.DataBase
+		if body.StartHour == 99 && body.EndHour == 99 {
+			result := db.Delete(&ScheduleForDay{}, "id = ?", body.Id)
+			res.Json(w, result, 200)
+			return
+		}
 		var schedule ScheduleForDay
 		err = db.Where("id = ?", body.Id).First(&schedule).Error
 		if err != nil {

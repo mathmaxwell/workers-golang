@@ -23,6 +23,7 @@ func NewAuthHandler(router *http.ServeMux, deps AuthhandlerDeps) *AuthHandler {
 	router.HandleFunc("/users/register", handler.register())
 	router.HandleFunc("/users/createUser", handler.createUser())
 	router.HandleFunc("/users/deleteUser", handler.deleteUser())
+	router.HandleFunc("/users/updateUser", handler.updateUser())
 	return handler
 }
 func (handler *AuthHandler) GetUserByToken(token string) (User, error) {
@@ -135,5 +136,35 @@ func (handler *AuthHandler) deleteUser() http.HandlerFunc {
 			return
 		}
 		res.Json(w, "user deleted", 200)
+	}
+}
+func (handler *AuthHandler) updateUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := req.HandleBody[updateRequest](&w, r)
+		if err != nil {
+			return
+		}
+
+		if body.UserId == "" {
+			res.Json(w, "userId is required", 400)
+			return
+		}
+
+		updates := map[string]interface{}{
+			"login":     body.Login,
+			"password":  body.Password,
+			"user_role": body.UserRole,
+		}
+
+		if err := handler.AuthRepository.DataBase.
+			Model(&User{}).
+			Where("token = ?", body.UserId).
+			Updates(updates).Error; err != nil {
+
+			res.Json(w, err.Error(), 500)
+			return
+		}
+
+		res.Json(w, "ok", 200)
 	}
 }

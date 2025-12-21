@@ -26,7 +26,6 @@ func NewMessagesHandler(router *http.ServeMux, deps MessagehandlerDeps) {
 	router.HandleFunc("/messages/readedMessage", handler.readedMessage())
 
 }
-
 func (handler *MessageHandler) createMessage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := req.HandleBody[createResponse](&w, r)
